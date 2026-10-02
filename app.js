@@ -11,6 +11,7 @@ const fmtDate=v=>{const [y,m,d]=v.date.split("-");return v.approx?`c. ${MONTHS[+
 const fmtLen=s=>{const h=Math.floor(s/3600),m=Math.floor(s%3600/60),x=s%60;return h?`${h}:${String(m).padStart(2,"0")}:${String(x).padStart(2,"0")}`:`${m}:${String(x).padStart(2,"0")}`};
 const esc=s=>s.replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const era=v=>{const y=+v.date.slice(0,4);return y<2000?"1990s":y<2010?"2000s":y<2020?"2010s":"2020s"};
+const thumb=v=>"https://i.ytimg.com/vi/"+v.id+"/mqdefault.jpg";
 const url=v=>"https://www.youtube.com/watch?v="+v.id;
 
 function filtered(){
@@ -21,8 +22,8 @@ function filtered(){
 
 function card(v){
   return `<button class="card ${store.seen[v.id]?"done":""}" data-id="${v.id}">
-    <div class="poster"><span class="tag">${esc(v.topic)}</span><span class="yr">${v.date.slice(0,4)}</span><span class="dt ${v.approx?"approx":""}">${fmtDate(v)}</span><span class="len">${fmtLen(v.sec)}</span><span class="seen"></span></div>
-    <div><h4>${esc(v.ta)}</h4><small>${esc(v.en)}</small></div></button>`;
+    <div class="poster"><span class="yr">${v.date.slice(0,4)}</span><span class="dt ${v.approx?"approx":""}">${fmtDate(v)}</span><img src="${thumb(v)}" alt="" loading="lazy" onerror="this.remove()"><span class="len">${fmtLen(v.sec)}</span><span class="seen"></span></div>
+    <div class="info"><h4>${esc(v.ta)}</h4><small>${esc(v.ch)}</small><small class="${v.approx?"approx":""}">${fmtDate(v)} · ${esc(v.topic)}</small><small class="gloss">${esc(v.en)}</small></div></button>`;
 }
 
 function rail(){
@@ -71,7 +72,7 @@ function renderDesk(id){
     </div>
     <div class="notes"><label for="note">My notes</label><textarea id="note" placeholder="Key points, verses, hadith cited, questions to follow up">${esc(store.notes[v.id]||"")}</textarea></div>
   </div>
-  <aside class="next"><h3>In order</h3>${up.map(u=>`<button class="row ${u.id===v.id?"cur":""} ${store.seen[u.id]?"done":""}" data-id="${u.id}"><div class="mini">${u.date.slice(0,4)}</div><div><span>${esc(u.ta)}</span><small>${fmtDate(u)} · ${fmtLen(u.sec)}</small></div></button>`).join("")}</aside>
+  <aside class="next"><h3>In order</h3>${up.map(u=>`<button class="row ${u.id===v.id?"cur":""} ${store.seen[u.id]?"done":""}" data-id="${u.id}"><div class="mini"><span>${u.date.slice(0,4)}</span><img src="${thumb(u)}" alt="" loading="lazy" onerror="this.remove()"></div><div><span>${esc(u.ta)}</span><small>${fmtDate(u)} · ${fmtLen(u.sec)}</small></div></button>`).join("")}</aside>
   </div></div>`;
   window.scrollTo(0,0);
   mountPlayer(v);
