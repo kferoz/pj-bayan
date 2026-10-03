@@ -1,4 +1,4 @@
-const V=window.PJ_ROWS.map((r,i)=>({id:r[0],date:r[1],approx:!!r[2],sec:r[3],ch:r[4],ta:r[5],en:r[6],topic:r[7],n:i+1}));
+const V=window.PJ_ROWS.map((r,i)=>({id:r[0],date:r[1],approx:!!r[2],und:r[2]===2,sec:r[3],ch:r[4],ta:r[5],en:r[6],topic:r[7],n:i+1}));
 
 const MONTHS=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 const $=s=>document.querySelector(s);
@@ -7,10 +7,10 @@ let store={seen:{},notes:{},pos:{},auto:true};
 try{const s=localStorage.getItem("pj-archive-v1");if(s)store=Object.assign(store,JSON.parse(s))}catch(e){}
 const save=()=>{try{localStorage.setItem("pj-archive-v1",JSON.stringify(store))}catch(e){}};
 
-const fmtDate=v=>{const [y,m,d]=v.date.split("-");return v.approx?`c. ${MONTHS[+m-1]} ${y}`:`${+d} ${MONTHS[+m-1]} ${y}`};
+const fmtDate=v=>{const [y,m,d]=v.date.split("-");if(v.und)return `Undated · uploaded ${y}`;return v.approx?`c. ${MONTHS[+m-1]} ${y}`:`${+d} ${MONTHS[+m-1]} ${y}`};
 const fmtLen=s=>{const h=Math.floor(s/3600),m=Math.floor(s%3600/60),x=s%60;return h?`${h}:${String(m).padStart(2,"0")}:${String(x).padStart(2,"0")}`:`${m}:${String(x).padStart(2,"0")}`};
 const esc=s=>s.replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
-const era=v=>{const y=+v.date.slice(0,4);return y<2000?"1990s":y<2010?"2000s":y<2020?"2010s":"2020s"};
+const era=v=>{if(v.und)return "Undated";const y=+v.date.slice(0,4);return y<2000?"1990s":y<2010?"2000s":y<2020?"2010s":"2020s"};
 const thumb=v=>"https://i.ytimg.com/vi/"+v.id+"/mqdefault.jpg";
 const url=v=>"https://www.youtube.com/watch?v="+v.id;
 
@@ -28,7 +28,7 @@ function card(v){
 
 function rail(){
   const topics=["All",...new Set(V.map(v=>v.topic))];
-  const eras=["All","1990s","2000s","2010s","2020s"];
+  const eras=["All","1990s","2000s","2010s","2020s","Undated"];
   const cnt=(f)=>V.filter(f).length;
   const done=V.filter(v=>store.seen[v.id]).length;
   return `<aside class="rail">
@@ -40,7 +40,7 @@ function rail(){
 
 function about(){return `<details class="about"><summary>About these sources</summary>
 <p>Every link goes to a public YouTube upload. They come from archive channels that re-upload PJ's talks (ONLINE PJ Kelvi Pathil, OnlinePJ, Online Dawah 24x7, Thowheed Speeches), plus two re-uploads by other accounts (AAFIYAH THOWHEED Media, mohamed Thoufeeq). Channel names are shown on each talk. I have not confirmed which of them PJ's organisation runs.</p>
-<p>Dates are the recording dates printed in the video titles or descriptions. Where none was given, the date is the YouTube upload date and is marked <span class="approx">c.</span> Old talks were uploaded years after they were given, so the upload date alone would mislead.</p>
+<p>Dates are the recording dates printed in the video titles or descriptions. Where none was given, the date is the YouTube upload date and is marked <span class="approx">c.</span> Older series that were bulk re-uploaded with no recording date are listed last under the <b>Undated</b> era; their year is only the upload year. Old talks were uploaded years after they were given, so the upload date alone would mislead.</p>
 <p>P. Jainulabdeen is a widely followed but contested figure. Other Tamil Muslim groups and scholars dispute parts of his teaching, and several clips in the wider catalogue are rebuttals aimed at his critics. For study, read opposing views alongside him.</p></details>`}
 
 function renderHome(){
