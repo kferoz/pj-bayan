@@ -161,6 +161,7 @@ document.addEventListener("click",e=>{
   if(t.id==="auto"){store.auto=!store.auto;save();t.setAttribute("aria-pressed",store.auto);return}
   if(t.id==="seen"){store.seen[state.open]=!store.seen[state.open];save();route();return}
   if(t.id==="prev"||t.id==="next"){const cv=V.find(v=>v.id===state.open),L=ctxList(cv),i=L.findIndex(v=>v.id===state.open);const n=L[i+(t.id==="next"?1:-1)];if(n)open(n.id);return}
+  if(t.id==="theme"){const dark=(document.documentElement.getAttribute("data-theme")||(matchMedia("(prefers-color-scheme:dark)").matches?"dark":"light"))==="dark";const n=dark?"light":"dark";document.documentElement.setAttribute("data-theme",n);try{localStorage.setItem("pj-theme",n)}catch(e){}return}
   if(t.id==="sort"){state.desc=!state.desc;t.textContent=state.desc?"Newest first":"Oldest first";t.setAttribute("aria-pressed",state.desc);state.open=null;route();return}
   if(t.id==="unseen"){state.unseen=!state.unseen;t.setAttribute("aria-pressed",state.unseen);state.open=null;route();return}
 });
