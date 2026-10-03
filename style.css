@@ -112,3 +112,15 @@ a{color:inherit}
 
 .row .mini img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
 .poster{border-radius:10px;border-color:transparent}
+
+/* playlists + paging */
+.seg{display:flex;flex-direction:row;gap:4px;background:var(--tint);padding:3px;border-radius:999px}
+.seg .chip{flex:1;justify-content:center;border-radius:999px;border:0}
+.plgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:14px}
+.pl{position:relative;display:flex;flex-direction:column;gap:3px;text-align:left;background:var(--surface);border:1px solid var(--rule);border-radius:10px;padding:14px 16px 14px;cursor:pointer;min-width:0}
+.pl:hover{border-color:var(--accent)}
+.pl b{font:600 16px/1.35 var(--f-display);padding-right:46px}
+.pl small{color:var(--muted);font-size:12.5px}
+.plc{position:absolute;right:12px;top:12px;font:500 12px var(--f-mono);background:var(--tint);color:var(--accent);padding:2px 8px;border-radius:999px}
+.more{display:flex;justify-content:center;margin:28px 0 8px}
+.count{font:12px var(--f-mono);color:var(--muted);margin-bottom:10px}
