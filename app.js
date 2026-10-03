@@ -1,4 +1,4 @@
-const V=window.PJ_ROWS.map((r,i)=>({id:r[0],date:r[1],approx:!!r[2],und:r[2]===2,sec:r[3],ch:r[4],ta:r[5],en:r[6],topic:r[7],n:i+1}));
+const V=window.PJ_ROWS.map((r,i)=>({id:r[0],date:r[1],approx:!!r[2],und:r[2]===2,sec:r[3],ch:r[4],ta:r[5],en:r[6],topic:r[7],vh:r[8],vt:r[9],vim:r[0][0]==="v"&&r[0].length>9&&/^v\d+$/.test(r[0]),n:i+1}));
 
 const MONTHS=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 const $=s=>document.querySelector(s);
@@ -11,8 +11,8 @@ const fmtDate=v=>{const [y,m,d]=v.date.split("-");if(v.und)return `Undated · up
 const fmtLen=s=>{const h=Math.floor(s/3600),m=Math.floor(s%3600/60),x=s%60;return h?`${h}:${String(m).padStart(2,"0")}:${String(x).padStart(2,"0")}`:`${m}:${String(x).padStart(2,"0")}`};
 const esc=s=>s.replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const era=v=>{if(v.und)return "Undated";const y=+v.date.slice(0,4);return y<2000?"1990s":y<2010?"2000s":y<2020?"2010s":"2020s"};
-const thumb=v=>"https://i.ytimg.com/vi/"+v.id+"/mqdefault.jpg";
-const url=v=>"https://www.youtube.com/watch?v="+v.id;
+const thumb=v=>v.vim?"https://i.vimeocdn.com/video/"+v.vt+"-d_640x360":"https://i.ytimg.com/vi/"+v.id+"/mqdefault.jpg";
+const url=v=>v.vim?"https://onlinepj.co.in/videos/?id="+v.id.slice(1):"https://www.youtube.com/watch?v="+v.id;
 
 function filtered(){
   const q=state.q.trim().toLowerCase();
@@ -61,7 +61,7 @@ function renderDesk(id){
   $("#app").innerHTML=`<div class="desk"><button class="btn back" id="back">← All talks</button>
   <div class="deskgrid"><div>
     <div class="stage"><div id="player"></div></div>
-    <p class="fallback">Video not loading? <a href="${url(v)}" target="_blank" rel="noopener">Open it on YouTube</a></p>
+    <p class="fallback">Video not loading? <a href="${url(v)}" target="_blank" rel="noopener">Open it on ${v.vim?"onlinepj.co.in":"YouTube"}</a></p>
     <h1 class="dtitle">${esc(v.ta)}</h1><p class="en">${esc(v.en)}</p>
     <div class="meta"><span>Recorded <b class="${v.approx?"approx":""}">${fmtDate(v)}</b></span><span>Length <b>${fmtLen(v.sec)}</b></span><span>Topic <b>${esc(v.topic)}</b></span><span>Channel <b>${esc(v.ch)}</b></span><span>No. <b>${v.n} of ${V.length}</b></span></div>
     <div class="acts">
@@ -82,9 +82,26 @@ function renderDesk(id){
 let yt=null,ytReady=false,ytQueue=null,tick=null;
 const s=document.createElement("script");s.src="https://www.youtube.com/iframe_api";document.head.appendChild(s);
 window.onYouTubeIframeAPIReady=()=>{ytReady=true;if(ytQueue){const v=ytQueue;ytQueue=null;mountPlayer(v)}};
+let vp=null,vpLoading=null;
+function loadVimeo(){return vpLoading||(vpLoading=new Promise(res=>{const x=document.createElement("script");x.src="https://player.vimeo.com/api/player.js";x.onload=res;document.head.appendChild(x)}))}
+function mountVimeo(v){
+  loadVimeo().then(()=>{
+    if(state.open!==v.id)return;
+    const el=document.getElementById("player");if(!el)return;
+    el.innerHTML='<iframe src="https://player.vimeo.com/video/'+v.id.slice(1)+'?h='+v.vh+'" style="width:100%;height:100%;border:0" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen></iframe>';
+    vp=new Vimeo.Player(el.firstChild);
+    const start=Math.max(0,(store.pos[v.id]||0)-3);
+    if(start>0)vp.setCurrentTime(start).catch(()=>{});
+    vp.on("timeupdate",d=>{store.pos[v.id]=d.seconds;if(Math.floor(d.seconds)%5===0)save()});
+    vp.on("pause",()=>{vp.getCurrentTime().then(t=>{store.pos[v.id]=t;save()})});
+    vp.on("ended",()=>{store.seen[v.id]=true;store.pos[v.id]=0;save();const i=V.findIndex(x=>x.id===v.id),n=V[i+1];if(store.auto&&n)open(n.id);else route()});
+  });
+}
 function mountPlayer(v){
   clearInterval(tick);
   if(yt&&yt.destroy){try{yt.destroy()}catch(e){}}yt=null;
+  if(vp){try{vp.destroy()}catch(e){}vp=null}
+  if(v.vim){mountVimeo(v);return}
   if(!ytReady){ytQueue=v;return}
   const start=Math.max(0,(store.pos[v.id]||0)-3);
   yt=new YT.Player("player",{width:"100%",height:"100%",videoId:v.id,
