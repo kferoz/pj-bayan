@@ -2,7 +2,7 @@ const V=window.PJ_ROWS.map((r,i)=>({id:r[0],date:r[1],approx:r[2]===1||r[2]===2,
 
 const MONTHS=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 const $=s=>document.querySelector(s);
-let state={q:"",topic:"All",era:"All",desc:false,unseen:false,open:null,view:"talks",pl:null,shown:240,hidePol:false,ctx:null};
+let state={qsub:"All",q:"",topic:"All",era:"All",desc:false,unseen:false,open:null,view:"talks",pl:null,shown:240,hidePol:false,ctx:null};
 const CATS=window.PJ_CATS||{};
 let store={seen:{},notes:{},pos:{},auto:true};
 try{const s=localStorage.getItem("pj-archive-v1");if(s)store=Object.assign(store,JSON.parse(s))}catch(e){}
@@ -31,12 +31,37 @@ function playlists(){
   m.forEach(p=>{p.items.sort((a,b)=>a.date<b.date?-1:a.date>b.date?1:a.n-b.n);p.first=p.items[0].date;p.last=p.items[p.items.length-1].date;p.hay=(p.ta+" "+p.en+" "+p.topic).toLowerCase()});
   return PL=[...m.values()];
 }
-const plList=k=>{const p=playlists().find(x=>x.key===k);if(!p)return[];return state.desc?p.items.slice().reverse():p.items};
+const BYID=new Map(V.map(v=>[v.id,v]));
+let SER=null;
+function series(){
+  if(SER)return SER;
+  return SER=(window.PJ_SER||[]).map((s,i)=>{
+    const items=s[2].map(id=>BYID.get(id)).filter(Boolean),parts={};s[2].forEach((id,j)=>parts[id]=s[3][j]);
+    const tc={};items.forEach(v=>tc[v.topic]=(tc[v.topic]||0)+1);
+    return {key:"S:"+i,kind:"series",ta:s[0],en:s[1],topic:Object.entries(tc).sort((a,b)=>b[1]-a[1])[0][0],pol:false,items,parts,first:items.reduce((m,v)=>v.date<m?v.date:m,"9"),last:items.reduce((m,v)=>v.date>m?v.date:m,"0"),hay:(s[0]+" "+s[1]).toLowerCase()};
+  }).filter(p=>p.items.length>=2);
+}
+/* sub-topics: keyword rules in topics.js, first match wins; the rest go to "Other talks" */
+let SUB=null;
+function subs(){
+  if(SUB)return SUB;
+  const defs=window.PJ_SUBS||[],m=new Map();
+  defs.forEach(d=>m.set(d[0],{key:"U:"+d[0],kind:"sub",id:d[0],en:d[1],ta:d[2],group:d[3],topic:d[3],pol:d[0]==="sects",items:[],kw:d[4]}));
+  m.set("misc",{key:"U:misc",kind:"sub",id:"misc",en:"Other talks",ta:"பிற உரைகள்",group:"Other",topic:"Other",pol:false,items:[],kw:[]});
+  const list=[...m.values()].filter(x=>x.id!=="misc");
+  V.forEach(v=>{const h=(v.ta+" "+v.en).toLowerCase();let hit=null;for(const d of list){if(d.kw.some(k=>h.includes(k))){hit=d;break}}(hit||m.get("misc")).items.push(v);v.sub=(hit||m.get("misc")).id});
+  m.forEach(p=>{if(p.items.length){p.first=p.items[0].date;p.last=p.items[p.items.length-1].date;p.hay=(p.ta+" "+p.en+" "+p.group).toLowerCase()}});
+  return SUB=[...m.values()].filter(p=>p.items.length);
+}
+const col=k=>k[0]==="S"&&k[1]===":"?series().find(x=>x.key===k):k[0]==="U"&&k[1]===":"?subs().find(x=>x.key===k):playlists().find(x=>x.key===k);
+const plList=k=>{const p=col(k);if(!p)return[];return state.desc?p.items.slice().reverse():p.items};
+const viewOf=k=>k[1]===":"?(k[0]==="S"?"series":"topics"):"playlists";
+const tabsBar=()=>`<nav class="tabs" aria-label="Sections">${[["talks","Videos"],["playlists","Playlists"],["series","Series"],["topics","Topics"],["qa","Q&A"]].map(([k,l])=>`<button data-view="${k}" aria-pressed="${state.view===k}">${l}</button>`).join("")}</nav>`;
 function more(list,html){return list.length>state.shown?`<div class="more"><button class="btn" id="more">Show more (${Math.min(300,list.length-state.shown)} of ${list.length-state.shown} left)</button></div>`:""}
 
 function card(v){
   return `<button class="card ${store.seen[v.id]?"done":""}" data-id="${v.id}">
-    <div class="poster"><span class="yr">${v.date.slice(0,4)}</span><span class="dt ${v.approx?"approx":""}">${fmtDate(v)}</span><img src="${thumb(v)}" alt="" loading="lazy" onerror="this.remove()"><span class="len">${fmtLen(v.sec)}</span><span class="seen"></span></div>
+    <div class="poster"><span class="yr">${state.pl&&col(state.pl)&&col(state.pl).parts?"Part "+col(state.pl).parts[v.id]:v.date.slice(0,4)}</span><span class="dt ${v.approx?"approx":""}">${fmtDate(v)}</span><img src="${thumb(v)}" alt="" loading="lazy" onerror="this.remove()"><span class="len">${fmtLen(v.sec)}</span><span class="seen"></span></div>
     <div class="info"><h4>${esc(v.ta)}</h4><small>${esc(v.ch)}</small><small class="${v.approx?"approx":""}">${fmtDate(v)} · ${esc(v.topic)}</small><small class="gloss">${esc(v.en)}</small></div></button>`;
 }
 
@@ -55,22 +80,47 @@ function rail(nav){
 
 function about(){return `<details class="about"><summary>About these sources</summary>
 <p>Every link goes to a public upload: YouTube, or Vimeo for videos that come from PJ's own site onlinepj.co.in. Sources are PJ's own channels and site (OnlinePJ, ONLINE PJ Kelvi Pathil, onlinepj.co.in), plus archive channels that re-upload his talks (Online Dawah 24x7, Thowheed Speeches). Third-party channels were kept only where the description names P. Jainulabdeen as the speaker. The channel is shown on each talk.</p>
-<p><b>Playlists</b> follow the categories on onlinepj.co.in (rebuttal and dispute series are marked as such); the rest are grouped by topic or channel and year. <b>Dates:</b> talks with a recording date print it. Short clips carry their upload date ("Uploaded …"), which is not when they were recorded. Older series bulk re-uploaded with no date are listed last under <b>Undated</b>.</p>
+<p><b>Series</b> are groups of titles that share a name and part numbers, shown in part order (same-part re-uploads on other channels are removed). <b>Topics</b> and the <b>Q&amp;A</b> filters are sorted automatically by keywords in the title, so a few talks land in the wrong topic or in "Other talks". <b>Playlists</b> follow the categories on onlinepj.co.in (rebuttal and dispute series are marked as such); the rest are grouped by topic or channel and year. <b>Dates:</b> talks with a recording date print it. Short clips carry their upload date ("Uploaded …"), which is not when they were recorded. Older series bulk re-uploaded with no date are listed last under <b>Undated</b>.</p>
 <p>Most of the short clips are Tamil titles only; I have not written English glosses for them. P. Jainulabdeen is a widely followed but contested figure. Other Tamil Muslim groups and scholars dispute parts of his teaching, and several playlists on his own site are rebuttals aimed at his critics (such as TNTJ). For study, read opposing views alongside him.</p></details>`}
 
 function renderHome(){
-  const nav=`<div class="seg"><button class="chip" data-view="talks" aria-pressed="${state.view==="talks"&&!state.pl}">All talks</button><button class="chip" data-view="playlists" aria-pressed="${state.view==="playlists"||!!state.pl}">Playlists</button></div>`;
+  const nav="",tb=tabsBar();
   if(state.view==="playlists"&&!state.pl){
     const q=state.q.trim().toLowerCase();
     const list=playlists().filter(p=>(state.topic==="All"||p.topic===state.topic)&&(!state.hidePol||!p.pol)&&(!q||p.hay.includes(q))).sort((a,b)=>b.items.length-a.items.length);
     const tiles=list.slice(0,state.shown).map(p=>`<button class="pl" data-pl="${esc(p.key)}"><span class="plc">${p.items.length}</span><b>${esc(p.ta)}</b><small>${esc(p.en)}</small><small>${esc(p.topic)} · ${p.first.slice(0,4)}–${p.last.slice(0,4)}${p.pol?' · <span class="approx">rebuttal</span>':""}</small></button>`).join("");
-    $("#app").innerHTML=`<div class="wrap">${rail(nav)}<section><div class="year"><h2>Playlists</h2><span>${list.length} categories · ${list.reduce((a,p)=>a+p.items.length,0)} talks</span></div><div class="plgrid">${tiles||'<div class="empty">No playlists match.</div>'}</div>${more(list)}${about()}</section></div>`;
+    $("#app").innerHTML=`<div class="wrap">${rail(nav)}<section>${tb}<div class="year"><h2>Playlists</h2><span>${list.length} categories · ${list.reduce((a,p)=>a+p.items.length,0)} talks</span></div><div class="plgrid">${tiles||'<div class="empty">No playlists match.</div>'}</div>${more(list)}${about()}</section></div>`;
+    return;
+  }
+  if(state.view==="series"&&!state.pl){
+    const q=state.q.trim().toLowerCase();
+    const list=series().filter(p=>(state.topic==="All"||p.topic===state.topic)&&(!q||p.hay.includes(q))).sort((a,b)=>b.items.length-a.items.length);
+    const tiles=list.slice(0,state.shown).map(p=>`<button class="pl" data-pl="${esc(p.key)}"><span class="plc">${p.items.length}</span><b>${esc(p.ta)}</b><small>${esc(p.en)}</small><small>${esc(p.topic)} · ${p.items.length} parts · ${p.first.slice(0,4)}–${p.last.slice(0,4)}</small></button>`).join("");
+    $("#app").innerHTML=`<div class="wrap">${rail(nav)}<section>${tb}<div class="year"><h2>Series</h2><span>${list.length} multi-part series · ${list.reduce((a,p)=>a+p.items.length,0)} talks, in part order</span></div><div class="plgrid">${tiles||'<div class="empty">No series match.</div>'}</div>${more(list)}${about()}</section></div>`;
+    return;
+  }
+  if(state.view==="topics"&&!state.pl){
+    const q=state.q.trim().toLowerCase();
+    const list=subs().filter(p=>!q||p.hay.includes(q));
+    const groups=[];list.forEach(p=>{let g=groups.find(x=>x.g===p.group);if(!g){g={g:p.group,items:[]};groups.push(g)}g.items.push(p)});
+    groups.forEach(g=>g.items.sort((a,b)=>(a.id==="misc")-(b.id==="misc")||b.items.length-a.items.length));
+    const body=groups.map(g=>`<div class="year"><h2>${esc(g.g)}</h2><span>${g.items.reduce((a,p)=>a+p.items.length,0)} talks</span></div><div class="plgrid">${g.items.map(p=>`<button class="pl" data-pl="${esc(p.key)}"><span class="plc">${p.items.length}</span><b>${esc(p.en)}</b><small>${esc(p.ta)}</small>${p.pol?'<small><span class="approx">includes rebuttals</span></small>':""}</button>`).join("")}</div>`).join("");
+    $("#app").innerHTML=`<div class="wrap">${rail(nav)}<section>${tb}<div class="year" style="margin-top:6px"><h2>Topics</h2><span>${list.length} sub-topics, sorted by keywords in each title</span></div>${body||'<div class="empty">No topics match.</div>'}${about()}</section></div>`;
+    return;
+  }
+  if(state.view==="qa"&&!state.pl){
+    const q=state.q.trim().toLowerCase(),sl=subs();
+    const base=V.filter(v=>v.topic==="Q&A"&&(!state.unseen||!store.seen[v.id])&&(!q||v.hay.includes(q)));
+    const cnt={};base.forEach(v=>cnt[v.sub]=(cnt[v.sub]||0)+1);
+    let l2=state.qsub==="All"?base:base.filter(v=>v.sub===state.qsub);if(state.desc)l2=l2.slice().reverse();
+    const chips=`<div class="chips qchips"><button class="chip" data-qsub="All" aria-pressed="${state.qsub==="All"}">All<i>${base.length}</i></button>${sl.filter(p=>cnt[p.id]).sort((a,b)=>cnt[b.id]-cnt[a.id]).map(p=>`<button class="chip" data-qsub="${p.id}" aria-pressed="${state.qsub===p.id}">${esc(p.en)}<i>${cnt[p.id]}</i></button>`).join("")}</div>`;
+    $("#app").innerHTML=`<div class="wrap">${rail(nav)}<section>${tb}<div class="year" style="margin-top:6px"><h2>Questions &amp; answers</h2><span>${l2.length} answers</span></div>${chips}${l2.length?`<div class="grid">${l2.slice(0,state.shown).map(card).join("")}</div>${more(l2)}`:'<div class="empty">No answers match.</div>'}${about()}</section></div>`;
     return;
   }
   if(state.pl){
-    const p=playlists().find(x=>x.key===state.pl);const list=plList(state.pl).filter(v=>!state.unseen||!store.seen[v.id]);
+    const p=col(state.pl);const list=plList(state.pl).filter(v=>!state.unseen||!store.seen[v.id]);
     const q=state.q.trim().toLowerCase();const l2=q?list.filter(v=>v.hay.includes(q)):list;
-    $("#app").innerHTML=`<div class="wrap">${rail(nav)}<section><button class="btn back" id="plback">← All playlists</button><div class="year"><h2 style="font-size:24px">${esc(p.ta)}</h2><span>${esc(p.en)} · ${l2.length} talks · ${p.first.slice(0,4)}–${p.last.slice(0,4)}</span></div>${l2.length?`<div class="grid">${l2.slice(0,state.shown).map(card).join("")}</div>${more(l2)}`:'<div class="empty">No talks match.</div>'}${about()}</section></div>`;
+    $("#app").innerHTML=`<div class="wrap">${rail(nav)}<section>${tb}<button class="btn back" id="plback">← All ${p.kind==="series"?"series":p.kind==="sub"?"topics":"playlists"}</button><div class="year"><h2 style="font-size:24px">${esc(p.kind==="sub"?p.en:p.ta)}</h2><span>${esc(p.kind==="sub"?p.ta:p.en)} · ${l2.length} talks · ${p.first.slice(0,4)}–${p.last.slice(0,4)}</span></div>${l2.length?`<div class="grid">${l2.slice(0,state.shown).map(card).join("")}</div>${more(l2)}`:'<div class="empty">No talks match.</div>'}${about()}</section></div>`;
     return;
   }
   const list=filtered();
@@ -80,7 +130,7 @@ function renderHome(){
     const groups=[];list.slice(0,state.shown).forEach(v=>{const y=state.era==="Undated"||v.und?"Undated · "+v.date.slice(0,4):v.date.slice(0,4);let g=groups[groups.length-1];if(!g||g.y!==y){g={y,items:[]};groups.push(g)}g.items.push(v)});
     html=groups.map(g=>`<div class="year"><h2>${g.y}</h2><span>${g.items.length} shown</span></div><div class="grid">${g.items.map(card).join("")}</div>`).join("")+more(list);
   }
-  $("#app").innerHTML=`<div class="wrap">${rail(nav)}<section><div class="count">${list.length} talks</div>${html}${about()}</section></div>`;
+  $("#app").innerHTML=`<div class="wrap">${rail(nav)}<section>${tb}<div class="count">${list.length} talks</div>${html}${about()}</section></div>`;
 }
 
 function ctxList(v){return state.pl?plList(state.pl):(state.ctxAll||V)}
@@ -88,12 +138,12 @@ function renderDesk(id){
   const v=V.find(x=>x.id===id);if(!v){state.open=null;return renderHome()}
   const L=ctxList(v),i=L.indexOf(v),prev=L[i-1],next=L[i+1];
   const up=L.slice(Math.max(0,i-2),i+8);
-  $("#app").innerHTML=`<div class="desk"><button class="btn back" id="back">${state.pl?"← Playlist":"← All talks"}</button>
+  $("#app").innerHTML=`<div class="desk"><button class="btn back" id="back">${state.pl?"← "+(col(state.pl)&&col(state.pl).kind==="series"?"Series":col(state.pl)&&col(state.pl).kind==="sub"?"Topic":"Playlist"):"← Back"}</button>
   <div class="deskgrid"><div>
     <div class="stage"><div id="player"></div></div>
     <p class="fallback">Video not loading? <a href="${url(v)}" target="_blank" rel="noopener">Open it on ${v.vim?"onlinepj.co.in":"YouTube"}</a></p>
     <h1 class="dtitle">${esc(v.ta)}</h1><p class="en">${esc(v.en)}</p>
-    <div class="meta"><span>${v.up?"Date":"Recorded"} <b class="${v.approx?"approx":""}">${fmtDate(v)}</b></span><span>Length <b>${fmtLen(v.sec)}</b></span><span>Topic <b>${esc(v.topic)}</b></span><span>Channel <b>${esc(v.ch)}</b></span><span>Playlist <b>${esc(plInfo(plKey(v)).en)}</b></span><span>No. <b>${i+1} of ${L.length}</b></span></div>
+    <div class="meta"><span>${v.up?"Date":"Recorded"} <b class="${v.approx?"approx":""}">${fmtDate(v)}</b></span><span>Length <b>${fmtLen(v.sec)}</b></span><span>Topic <b>${esc(v.topic)}</b></span><span>Channel <b>${esc(v.ch)}</b></span><span>${state.pl&&col(state.pl)?col(state.pl).kind==="series"?"Series":col(state.pl).kind==="sub"?"Topic":"Playlist":"Playlist"} <b>${esc(state.pl&&col(state.pl)?(col(state.pl).kind==="sub"?col(state.pl).en:col(state.pl).en||col(state.pl).ta):plInfo(plKey(v)).en)}</b></span><span>No. <b>${i+1} of ${L.length}</b></span></div>
     <div class="acts">
       <button class="btn" id="seen" aria-pressed="${!!store.seen[v.id]}">${store.seen[v.id]?"✓ Watched":"Mark as watched"}</button>
       <button class="btn" id="auto" aria-pressed="${store.auto}">Auto-play next</button>
@@ -150,9 +200,10 @@ function open(id){state.open=id;try{history.replaceState(null,"","#"+id)}catch(e
 
 document.addEventListener("click",e=>{
   const t=e.target.closest("button");if(!t)return;
-  if(t.dataset.id){if(!state.pl)state.ctxAll=filtered();open(t.dataset.id);return}
+  if(t.dataset.id){if(!state.pl)state.ctxAll=state.view==="qa"?V.filter(v=>v.topic==="Q&A"&&(state.qsub==="All"||v.sub===state.qsub)&&(!state.q.trim()||v.hay.includes(state.q.trim().toLowerCase()))):filtered();open(t.dataset.id);return}
   if(t.dataset.view){state.view=t.dataset.view;state.pl=null;state.open=null;state.shown=240;state.ctxAll=null;route();window.scrollTo(0,0);return}
-  if(t.dataset.pl){state.pl=t.dataset.pl;state.shown=240;state.view="playlists";window.scrollTo(0,0);route();return}
+  if(t.dataset.qsub){state.qsub=t.dataset.qsub;state.shown=240;route();return}
+  if(t.dataset.pl){state.pl=t.dataset.pl;state.shown=240;state.view=viewOf(t.dataset.pl);window.scrollTo(0,0);route();return}
   if(t.id==="plback"){state.pl=null;state.shown=240;route();return}
   if(t.id==="more"){state.shown+=300;route();return}
   if(t.dataset.era){state.shown=240;state.era=t.dataset.era;route();return}
