@@ -56,6 +56,8 @@ function subs(){
 const col=k=>k[0]==="S"&&k[1]===":"?series().find(x=>x.key===k):k[0]==="U"&&k[1]===":"?subs().find(x=>x.key===k):playlists().find(x=>x.key===k);
 const plList=k=>{const p=col(k);if(!p)return[];return state.desc?p.items.slice().reverse():p.items};
 const viewOf=k=>k[1]===":"?(k[0]==="S"?"series":"topics"):"playlists";
+const plThumb=p=>{const v=p.items.find(x=>!x.vim)||p.items[0];return v?thumb(v):""};
+const plTile=(p,t,s1,s2)=>`<button class="pl" data-pl="${esc(p.key)}"><div class="plposter"><img src="${plThumb(p)}" alt="" loading="lazy" onerror="this.remove()"><span class="plc"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1 3h10v1.6H1zm0 4h10v1.6H1zm0 4h6v1.6H1zM12 8l4 2.5-4 2.5z"/></svg>${p.items.length} videos</span></div><div class="plinfo"><b>${esc(t)}</b>${s1?`<small>${esc(s1)}</small>`:""}${s2?`<small>${s2}</small>`:""}</div></button>`;
 const tabsBar=()=>`<nav class="tabs" aria-label="Sections">${[["talks","Videos"],["playlists","Playlists"],["series","Series"],["topics","Topics"],["qa","Q&A"]].map(([k,l])=>`<button data-view="${k}" aria-pressed="${state.view===k}">${l}</button>`).join("")}</nav>`;
 function more(list,html){return list.length>state.shown?`<div class="more"><button class="btn" id="more">Show more (${Math.min(300,list.length-state.shown)} of ${list.length-state.shown} left)</button></div>`:""}
 
@@ -88,14 +90,14 @@ function renderHome(){
   if(state.view==="playlists"&&!state.pl){
     const q=state.q.trim().toLowerCase();
     const list=playlists().filter(p=>(state.topic==="All"||p.topic===state.topic)&&(!state.hidePol||!p.pol)&&(!q||p.hay.includes(q))).sort((a,b)=>b.items.length-a.items.length);
-    const tiles=list.slice(0,state.shown).map(p=>`<button class="pl" data-pl="${esc(p.key)}"><span class="plc">${p.items.length}</span><b>${esc(p.ta)}</b><small>${esc(p.en)}</small><small>${esc(p.topic)} · ${p.first.slice(0,4)}–${p.last.slice(0,4)}${p.pol?' · <span class="approx">rebuttal</span>':""}</small></button>`).join("");
+    const tiles=list.slice(0,state.shown).map(p=>plTile(p,p.ta,p.en,esc(p.topic)+" · "+p.first.slice(0,4)+"–"+p.last.slice(0,4)+(p.pol?' · <span class="approx">rebuttal</span>':""))).join("");
     $("#app").innerHTML=`<div class="wrap">${rail(nav)}<section>${tb}<div class="year"><h2>Playlists</h2><span>${list.length} categories · ${list.reduce((a,p)=>a+p.items.length,0)} talks</span></div><div class="plgrid">${tiles||'<div class="empty">No playlists match.</div>'}</div>${more(list)}${about()}</section></div>`;
     return;
   }
   if(state.view==="series"&&!state.pl){
     const q=state.q.trim().toLowerCase();
     const list=series().filter(p=>(state.topic==="All"||p.topic===state.topic)&&(!q||p.hay.includes(q))).sort((a,b)=>b.items.length-a.items.length);
-    const tiles=list.slice(0,state.shown).map(p=>`<button class="pl" data-pl="${esc(p.key)}"><span class="plc">${p.items.length}</span><b>${esc(p.ta)}</b><small>${esc(p.en)}</small><small>${esc(p.topic)} · ${p.items.length} parts · ${p.first.slice(0,4)}–${p.last.slice(0,4)}</small></button>`).join("");
+    const tiles=list.slice(0,state.shown).map(p=>plTile(p,p.ta,p.en,esc(p.topic)+" · "+p.first.slice(0,4)+"–"+p.last.slice(0,4))).join("");
     $("#app").innerHTML=`<div class="wrap">${rail(nav)}<section>${tb}<div class="year"><h2>Series</h2><span>${list.length} multi-part series · ${list.reduce((a,p)=>a+p.items.length,0)} talks, in part order</span></div><div class="plgrid">${tiles||'<div class="empty">No series match.</div>'}</div>${more(list)}${about()}</section></div>`;
     return;
   }
@@ -104,7 +106,7 @@ function renderHome(){
     const list=subs().filter(p=>!q||p.hay.includes(q));
     const groups=[];list.forEach(p=>{let g=groups.find(x=>x.g===p.group);if(!g){g={g:p.group,items:[]};groups.push(g)}g.items.push(p)});
     groups.forEach(g=>g.items.sort((a,b)=>(a.id==="misc")-(b.id==="misc")||b.items.length-a.items.length));
-    const body=groups.map(g=>`<div class="year"><h2>${esc(g.g)}</h2><span>${g.items.reduce((a,p)=>a+p.items.length,0)} talks</span></div><div class="plgrid">${g.items.map(p=>`<button class="pl" data-pl="${esc(p.key)}"><span class="plc">${p.items.length}</span><b>${esc(p.en)}</b><small>${esc(p.ta)}</small>${p.pol?'<small><span class="approx">includes rebuttals</span></small>':""}</button>`).join("")}</div>`).join("");
+    const body=groups.map(g=>`<div class="year"><h2>${esc(g.g)}</h2><span>${g.items.reduce((a,p)=>a+p.items.length,0)} talks</span></div><div class="plgrid">${g.items.map(p=>plTile(p,p.en,p.ta,p.pol?'<span class="approx">includes rebuttals</span>':"")).join("")}</div>`).join("");
     $("#app").innerHTML=`<div class="wrap">${rail(nav)}<section>${tb}<div class="year" style="margin-top:6px"><h2>Topics</h2><span>${list.length} sub-topics, sorted by keywords in each title</span></div>${body||'<div class="empty">No topics match.</div>'}${about()}</section></div>`;
     return;
   }
